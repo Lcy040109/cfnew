@@ -742,6 +742,9 @@ export default {
       优选地址源 = 获取配置文本值('yxURL', 配置默认值.yxURL, 本地值734.yxURL || 本地值734.YXURL);
       自定义路径 = 获取配置文本值('d', 配置默认值.d, 本地值734.d || 本地值734.D);
       const 网址698 = new URL(请求735.url);
+      // 小卢分享入口 v1：admin 仅作为后台路径，不写入订阅
+      const 管理入口 = String(本地值734.admin || 本地值734.ADMIN || '').trim().replace(/^\\/+|\\/+$/g, '');
+      const 管理入口路径 = 管理入口 ? '/' + 管理入口 : '';
       if (网址698.pathname.includes('/api/config')) {
         const 路径部分列表697 = 网址698.pathname.split('/').filter(参数值696 => 参数值696);
         const 接口索引695 = 路径部分列表697.indexOf('api');
@@ -749,7 +752,9 @@ export default {
           const 路径值694 = 路径部分列表697.slice(0, 接口索引695);
           const 路径值693 = 路径值694.join('/');
           let 是否有效692 = false;
-          if (自定义路径 && 自定义路径.trim()) {
+          if (管理入口) {
+            是否有效692 = 路径值693 === 管理入口;
+          } else if (自定义路径 && 自定义路径.trim()) {
             const 清理自定义路径691 = 自定义路径.trim().startsWith('/') ? 自定义路径.trim().substring(1) : 自定义路径.trim();
             是否有效692 = 路径值693 === 清理自定义路径691;
           } else {
@@ -784,7 +789,9 @@ export default {
           const 路径值688 = 路径部分列表690.slice(0, 接口索引);
           const 路径值687 = 路径值688.join('/');
           let 是否有效686 = false;
-          if (自定义路径 && 自定义路径.trim()) {
+          if (管理入口) {
+            是否有效686 = 路径值687 === 管理入口;
+          } else if (自定义路径 && 自定义路径.trim()) {
             const 清理自定义路径685 = 自定义路径.trim().startsWith('/') ? 自定义路径.trim().substring(1) : 自定义路径.trim();
             是否有效686 = 路径值687 === 清理自定义路径685;
           } else {
@@ -852,7 +859,9 @@ export default {
           if (路径部分列表683.length === 2 && 路径部分列表683[1] === 'region') {
             const 路径值681 = 路径部分列表683[0];
             let 是否有效680 = false;
-            if (自定义路径 && 自定义路径.trim()) {
+            if (管理入口) {
+              是否有效680 = 路径值681 === 管理入口;
+            } else if (自定义路径 && 自定义路径.trim()) {
               // 使用自定义路径
               const 清理自定义路径679 = 自定义路径.trim().startsWith('/') ? 自定义路径.trim().substring(1) : 自定义路径.trim();
               是否有效680 = 路径值681 === 清理自定义路径679;
@@ -917,7 +926,9 @@ export default {
           if (路径部分列表676.length === 2 && 路径部分列表676[1] === 'test-api') {
             const 路径值 = 路径部分列表676[0];
             let 是否有效 = false;
-            if (自定义路径 && 自定义路径.trim()) {
+            if (管理入口) {
+              是否有效 = 路径值 === 管理入口;
+            } else if (自定义路径 && 自定义路径.trim()) {
               // 使用自定义路径
               const 清理自定义路径674 = 自定义路径.trim().startsWith('/') ? 自定义路径.trim().substring(1) : 自定义路径.trim();
               是否有效 = 路径值 === 清理自定义路径674;
@@ -960,6 +971,16 @@ export default {
             }
           }
         }
+        // 独立后台入口：/你的admin值
+        if (管理入口 && 网址698.pathname.replace(/\\/$/, '') === 管理入口路径) {
+          return await 处理订阅值(请求735, 认证令牌);
+        }
+
+        // 公共分享订阅入口：不会暴露后台路径
+        if (网址698.pathname.replace(/\\/$/, '') === '/sub/xiaolu') {
+          return await 处理订阅请求(请求735, 认证令牌, 网址698);
+        }
+
         if (网址698.pathname === '/') {
           // 小卢自定义伪装首页 v1
           return new Response(`<!doctype html>
@@ -1658,6 +1679,16 @@ document.addEventListener('DOMContentLoaded', function () {
           const 规范化自定义路径 = 清理自定义路径.endsWith('/') && 清理自定义路径.length > 1 ? 清理自定义路径.slice(0, -1) : 清理自定义路径;
           const 规范化路径 = 网址698.pathname.endsWith('/') && 网址698.pathname.length > 1 ? 网址698.pathname.slice(0, -1) : 网址698.pathname;
           if (规范化路径 === 规范化自定义路径) {
+            if (管理入口) {
+              return new Response(JSON.stringify({
+                error: 'Not Found'
+              }), {
+                status: 404,
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+            }
             return await 处理订阅值(请求735, 认证令牌);
           }
           if (规范化路径 === 规范化自定义路径 + '/sub') {
@@ -1682,6 +1713,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const 用户657 = 网址698.pathname.replace(/\/$/, '').substring(1);
             if (是否有效格式(用户657)) {
               if (用户657 === 认证令牌) {
+                if (管理入口) {
+                  return new Response(JSON.stringify({
+                    error: 'Not Found'
+                  }), {
+                    status: 404,
+                    headers: {
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                }
                 return await 处理订阅值(请求735, 用户657);
               } else {
                 return new Response(JSON.stringify({
@@ -6136,7 +6177,7 @@ function 尝试打开应用(方案网址20197, 回退回调, 超时20196) {
 }
 function 生成客户端链接(客户端类型, 客户端名称) {
   var 当前网址20192 = window.location.href;
-  var 订阅网址20191 = 当前网址20192 + "/sub";
+  var 订阅网址20191 = window.location.origin + "/sub/xiaolu";
   var 方案网址 = '';
   var 显示名称 = 客户端名称 || '';
   var 最终网址 = 订阅网址20191;
