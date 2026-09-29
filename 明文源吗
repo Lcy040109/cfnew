@@ -743,7 +743,7 @@ export default {
       自定义路径 = 获取配置文本值('d', 配置默认值.d, 本地值734.d || 本地值734.D);
       const 网址698 = new URL(请求735.url);
       // 小卢分享入口 v1：admin 仅作为后台路径，不写入订阅
-      const 管理入口 = String(本地值734.admin || 本地值734.ADMIN || '').trim().replace(/^\\/+|\\/+$/g, '');
+      const 管理入口 = String(本地值734.admin || 本地值734.ADMIN || '').trim().replace(/^\/+|\/+$/g, '');
       const 管理入口路径 = 管理入口 ? '/' + 管理入口 : '';
       if (网址698.pathname.includes('/api/config')) {
         const 路径部分列表697 = 网址698.pathname.split('/').filter(参数值696 => 参数值696);
@@ -972,12 +972,12 @@ export default {
           }
         }
         // 独立后台入口：/你的admin值
-        if (管理入口 && 网址698.pathname.replace(/\\/$/, '') === 管理入口路径) {
+        if (管理入口 && 网址698.pathname.replace(/\/$/, '') === 管理入口路径) {
           return await 处理订阅值(请求735, 认证令牌);
         }
 
         // 公共分享订阅入口：不会暴露后台路径
-        if (网址698.pathname.replace(/\\/$/, '') === '/sub/xiaolu') {
+        if (网址698.pathname.replace(/\/$/, '') === '/sub/xiaolu') {
           return await 处理订阅请求(请求735, 认证令牌, 网址698);
         }
 
