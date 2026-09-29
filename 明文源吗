@@ -621,18 +621,26 @@ export default {
       const 是否值732 = 请求735.method === 'POST';
       const 请求网址731 = new URL(请求735.url);
       const 路径值730 = 请求网址731.pathname.split('/').filter(参数值729 => 参数值729);
+
+      // 先加载 KV，再做路径校验；这样后台自定义路径和公开分享入口不会被提前 404
+      await 处理值键值值(本地值734);
       if (!是否网页套接字 && !是否值732 && 请求网址731.pathname !== '/') {
         const 值值728 = (本地值734.u || 本地值734.U || '').toLowerCase();
-        const 值值727 = (本地值734.d || 本地值734.D || '').toLowerCase();
-        const 首次值 = 路径值730[0] || '';
+        const 配置路径值 = 获取配置值('d', 本地值734.d || 本地值734.D || '');
+        const 值值727 = String(配置路径值 || '').toLowerCase();
+        const 管理入口预检 = String(本地值734.admin || 本地值734.ADMIN || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+        const 首次值 = (路径值730[0] || '').toLowerCase();
         const 清理值 = 值值727.startsWith('/') ? 值值727.substring(1) : 值值727;
-        if (首次值 !== 值值728 && (清理值 ? 首次值 !== 清理值 : false)) {
+        const 是公开分享入口 = 请求网址731.pathname.replace(/\/$/, '') === '/sub/xiaolu';
+        const 是管理入口 = !!管理入口预检 && 首次值 === 管理入口预检;
+        const 是UUID入口 = 首次值 === 值值728;
+        const 是自定义路径入口 = !!清理值 && 首次值 === 清理值;
+        if (!是公开分享入口 && !是管理入口 && !是UUID入口 && !是自定义路径入口) {
           return new Response('Not Found', {
             status: 404
           });
         }
       }
-      await 处理值键值值(本地值734);
       认证令牌 = (本地值734.u || 本地值734.U || 认证令牌).toLowerCase();
       const 值路径 = (本地值734.d || 本地值734.D || 认证令牌).toLowerCase();
       const 本地值726 = 获取配置值('p', 本地值734.p || 本地值734.P);
@@ -722,6 +730,7 @@ export default {
       启用仓库优选 = 获取配置开关值('egi', true, 本地值734.egi || 本地值734.EGI);
       启用原生地址 = 获取配置开关值('ena', false, 本地值734.ena || 本地值734.ENA);
       启用家宽链式 = 获取配置开关值('jk', false, 本地值734.jk || 本地值734.JK);
+      家宽国家筛选 = 获取配置文本值('jkCountry', 'ALL', 本地值734.jkCountry || 本地值734.JKCOUNTRY || 本地值734.JK_COUNTRY).trim().toUpperCase() || 'ALL';
       启用加密客户端问候 = 获取配置开关值('ech', false, 本地值734.ech || 本地值734.ECH);
 
       // 加载自定义DNS和ECH域名配置
