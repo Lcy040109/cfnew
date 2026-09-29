@@ -42,6 +42,7 @@ let 启用仓库优选 = true;
 let 启用原生地址 = false; // 原生地址默认关闭          
 // 家宽链式：cfnew 自己的节点当前置，落地换成住宅宽带
 let 启用家宽链式 = false;
+let 家宽国家筛选 = 'ALL';
 
 let 键值存储 = null;
 let 键值配置 = {};
@@ -79,7 +80,8 @@ const 配置默认值 = {
   ispMobile: 'yes',
   ispUnicom: 'yes',
   ispTelecom: 'yes',
-  jk: 'no'
+  jk: 'no',
+  jkCountry: 'ALL'
 };
 
 function 是否开启值(值, 默认启用 = false) {
@@ -164,7 +166,8 @@ function 获取环境配置快照(环境值 = {}) {
     ispMobile: ['ispMobile', 'ISPMOBILE', 'ISP_MOBILE'],
     ispUnicom: ['ispUnicom', 'ISPUNICOM', 'ISP_UNICOM'],
     ispTelecom: ['ispTelecom', 'ISPTELECOM', 'ISP_TELECOM'],
-    jk: ['jk', 'JK']
+    jk: ['jk', 'JK'],
+    jkCountry: ['jkCountry', 'JKCOUNTRY', 'JK_COUNTRY']
   };
   const 快照 = {};
   for (const [键, 名称列表] of Object.entries(映射)) {
@@ -2894,8 +2897,16 @@ async function 生成家宽链式值(链接列表) {
   const 前置名称 = 前置节点.map(项 => 项.name);
   const 域名系统 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
   const { 节点列表, 证书 } = await 获取家宽节点();
+  const 当前筛选国家 = String(家宽国家筛选 || 'ALL').toUpperCase();
+  const 筛选后节点列表 = 当前筛选国家 === 'ALL'
+    ? 节点列表
+    : 节点列表.filter(节点 => String(节点.国家 || '').toUpperCase() === 当前筛选国家);
+  if (!筛选后节点列表.length) {
+    const 国家显示 = 家宽国家中文名(当前筛选国家);
+    throw new Error('当前没有可用的' + 国家显示 + '家宽节点，请稍后更新或切回“全部国家”');
+  }
   const 国家计数 = {};
-  const 家宽项 = 节点列表.map(节点 => {
+  const 家宽项 = 筛选后节点列表.map(节点 => {
     const 国家名 = 家宽国家中文名(节点.国家);
     国家计数[国家名] = (国家计数[国家名] || 0) + 1;
     return { ...节点, 国家名, 名称: '\ud83c\udfe0 ' + 国家名 + '-家宽-' + String(国家计数[国家名]).padStart(2, '0') };
@@ -5895,6 +5906,24 @@ async function 处理订阅值(请求241, 用户240 = null) {
                                         <span style="font-size: 1.1rem;">${翻译值.jkEnable}</span>
                                 </label>
                                     <small style="color: #7aa9c4; font-size: 0.85rem; display: block; margin-top: 10px;">${翻译值.jkHint}</small>
+                                <div style="margin-top: 14px;">
+                                    <label for="jkCountry" style="display:block;margin-bottom:8px;color:#00f0ff;font-weight:bold;">家宽国家筛选</label>
+                                    <select id="jkCountry" style="width:100%;padding:10px 12px;background:rgba(0,0,0,.75);color:#00f0ff;border:1px solid #00f0ff;border-radius:5px;">
+                                        <option value="ALL">全部国家</option>
+                                        <option value="US">🇺🇸 美国</option>
+                                        <option value="JP">🇯🇵 日本</option>
+                                        <option value="KR">🇰🇷 韩国</option>
+                                        <option value="SG">🇸🇬 新加坡</option>
+                                        <option value="HK">🇭🇰 香港</option>
+                                        <option value="TW">🇹🇼 台湾</option>
+                                        <option value="CA">🇨🇦 加拿大</option>
+                                        <option value="GB">🇬🇧 英国</option>
+                                        <option value="DE">🇩🇪 德国</option>
+                                        <option value="FR">🇫🇷 法国</option>
+                                        <option value="AU">🇦🇺 澳大利亚</option>
+                                    </select>
+                                    <small style="color:#7aa9c4;font-size:.85rem;display:block;margin-top:8px;">选择美国后，CLASH 家宽订阅只保留当前可用的美国家宽节点。</small>
+                                </div>
                             </div>
                         </div>
                         <div style="margin-bottom: 15px;">
@@ -6780,6 +6809,7 @@ function 应用配置到界面(配置) {
   写入字段值('scu', 配置.scu);
   写入开关值('ena', 配置.ena, false);
   写入开关值('jk', 配置.jk, false);
+  写入字段值('jkCountry', 配置.jkCountry || 'ALL');
   const 家宽按钮 = document.getElementById('jkClientBtn');
   if (家宽按钮) 家宽按钮.style.display = 是否开关启用(配置.jk, false) ? '' : 'none';
   写入开关值('epd', 配置.epd, true);
@@ -6824,6 +6854,7 @@ function 收集界面配置() {
     scu: 读取字段值('scu'),
     ena: 读取开关值('ena', false),
     jk: 读取开关值('jk', false),
+    jkCountry: 读取字段值('jkCountry') || 'ALL',
     epd: 读取开关值('epd', true),
     epi: 读取开关值('epi', true),
     egi: 读取开关值('egi', true),
@@ -7026,6 +7057,7 @@ async function 重置全部配置() {
           ispMobile: '',
           ispUnicom: '',
           ispTelecom: '',
+          jkCountry: '',
           homepage: '',
           alpn: ''
         })
@@ -9230,6 +9262,7 @@ function 更新配置值() {
   启用仓库优选 = 有效配置.egi === 'yes';
   启用原生地址 = 有效配置.ena === 'yes';
   启用家宽链式 = 有效配置.jk === 'yes';
+  家宽国家筛选 = String(有效配置.jkCountry || 'ALL').trim().toUpperCase() || 'ALL';
   启用加密客户端问候 = 有效配置.ech === 'yes';
   自定义域名系统 = 有效配置.customDNS || 配置默认值.customDNS;
   自定义加密客户端问候域名 = 有效配置.customECHDomain || 配置默认值.customECHDomain;
