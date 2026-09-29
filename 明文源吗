@@ -2894,7 +2894,10 @@ function 家宽国家中文名(代码) {
 }
 
 async function 生成家宽链式值(链接列表) {
-  const 前置组名 = '\u26a1 CF前置';
+  const 当前筛选国家 = String(家宽国家筛选 || 'ALL').toUpperCase();
+  const 前置国家名 = 当前筛选国家 === 'ALL' ? 'CF' : 家宽国家中文名(当前筛选国家);
+  const 前置显示前缀 = 当前筛选国家 === 'ALL' ? 'CF前置' : 前置国家名 + '前置';
+  const 前置组名 = '\u26a1 ' + 前置显示前缀;
   const 家宽自动 = '\ud83c\udfe0 家宽自动';
   const 家宽手选 = '\ud83c\udfe0 家宽节点';
   const 节点选择 = '\ud83d\ude80 节点选择';
@@ -2902,11 +2905,15 @@ async function 生成家宽链式值(链接列表) {
     .filter(项 => 项 && (项.proto === 解码64('dmxlc3M=') || 项.proto === 解码64('dHJvamFu')));
   // 落地隧道的握手特征很明显，前置用明文会被一眼认出来，有 TLS 节点就只用 TLS 的
   const 加密前置 = 全部前置.filter(项 => 项.tls);
-  const 前置节点 = 加密前置.length ? 加密前置 : 全部前置;
+  const 原始前置节点 = 加密前置.length ? 加密前置 : 全部前置;
+  // 前置名称跟随家宽国家筛选显示。注意这里只是链路标签，不代表 Cloudflare 实际接入机房国家。
+  const 前置节点 = 原始前置节点.map((项, 索引) => ({
+    ...项,
+    name: '\u26a1 ' + 前置显示前缀 + '-' + String(索引 + 1).padStart(2, '0')
+  }));
   const 前置名称 = 前置节点.map(项 => 项.name);
   const 域名系统 = 自定义域名系统 || 'https://223.5.5.5/dns-query';
   const { 节点列表, 证书 } = await 获取家宽节点();
-  const 当前筛选国家 = String(家宽国家筛选 || 'ALL').toUpperCase();
   const 筛选后节点列表 = 当前筛选国家 === 'ALL'
     ? 节点列表
     : 节点列表.filter(节点 => String(节点.国家 || '').toUpperCase() === 当前筛选国家);
