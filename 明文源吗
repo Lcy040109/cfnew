@@ -81,7 +81,8 @@ const 配置默认值 = {
   ispUnicom: 'yes',
   ispTelecom: 'yes',
   jk: 'no',
-  jkCountry: 'ALL'
+  jkCountry: 'ALL',
+  frontExitMap: ''
 };
 
 function 是否开启值(值, 默认启用 = false) {
@@ -167,7 +168,8 @@ function 获取环境配置快照(环境值 = {}) {
     ispUnicom: ['ispUnicom', 'ISPUNICOM', 'ISP_UNICOM'],
     ispTelecom: ['ispTelecom', 'ISPTELECOM', 'ISP_TELECOM'],
     jk: ['jk', 'JK'],
-    jkCountry: ['jkCountry', 'JKCOUNTRY', 'JK_COUNTRY']
+    jkCountry: ['jkCountry', 'JKCOUNTRY', 'JK_COUNTRY'],
+    frontExitMap: ['frontExitMap', 'FRONT_EXIT_MAP']
   };
   const 快照 = {};
   for (const [键, 名称列表] of Object.entries(映射)) {
@@ -2894,77 +2896,29 @@ function 家宽国家中文名(代码) {
 }
 
 
-const 前置国家缓存 = new Map();
-
-function 是IP地址值(主机) {
-  const 值 = 规范化节点主机(主机);
-  if (!值) return false;
-  if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(值)) return true;
-  return 值.includes(':') && /^[0-9a-fA-F:.]+$/.test(值);
-}
-
-async function 解析前置主机IP(主机) {
-  const 值 = 规范化节点主机(主机);
-  if (!值) return '';
-  if (是IP地址值(值)) return 值;
-  try {
-    const 响应 = await fetch('https://cloudflare-dns.com/dns-query?name=' + encodeURIComponent(值) + '&type=A', {
-      headers: { 'Accept': 'application/dns-json' }
-    });
-    if (!响应.ok) return '';
-    const 数据 = await 响应.json();
-    const 答案 = Array.isArray(数据.Answer) ? 数据.Answer.find(项 => 项 && 项.type === 1 && 项.data) : null;
-    return 答案 ? String(答案.data).trim() : '';
-  } catch (错误) {
-    return '';
+// 不根据前置服务器的 GeoIP 猜测出口国家：Cloudflare 任播入口并不等于代理出口。
+// 只有用户通过客户端实际走该前置节点后确认的出口国家，才用于命名。
+// 后台 frontExitMap 每行格式：server=HK 或 example.com=US。
+function 解析前置出口国家映射(文本) {
+  const 结果 = new Map();
+  for (const 行 of String(文本 || '').split(/[\r\n,;]+/)) {
+    const 位置 = 行.lastIndexOf('=');
+    if (位置 < 1) continue;
+    const 主机 = 规范化节点主机(行.slice(0, 位置).trim()).toLowerCase();
+    const 国家代码 = 行.slice(位置 + 1).trim().toUpperCase();
+    if (主机 && /^[A-Z]{2}$/.test(国家代码)) {
+      结果.set(主机, 国家代码);
+    }
   }
+  return 结果;
 }
 
 async function 获取前置国家代码映射(节点列表) {
-  const 主机到IP = new Map();
-  const 主机列表 = [...new Set(节点列表.map(项 => 规范化节点主机(项.server)).filter(Boolean))];
-
-  await Promise.all(主机列表.map(async 主机 => {
-    const 缓存键 = 'host:' + 主机;
-    if (前置国家缓存.has(缓存键)) {
-      主机到IP.set(主机, 前置国家缓存.get(缓存键).ip || '');
-      return;
-    }
-    const ip = await 解析前置主机IP(主机);
-    主机到IP.set(主机, ip);
-    前置国家缓存.set(缓存键, { ip, code: '' });
-  }));
-
-  const 待查询IP = [...new Set([...主机到IP.values()].filter(Boolean))]
-    .filter(ip => !前置国家缓存.has('ip:' + ip));
-
-  for (let i = 0; i < 待查询IP.length; i += 100) {
-    const 批次 = 待查询IP.slice(i, i + 100);
-    try {
-      const 响应 = await fetch('https://countries.dev/ip', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(批次)
-      });
-      if (!响应.ok) continue;
-      const 数据 = await 响应.json();
-      const 列表 = Array.isArray(数据) ? 数据 : (Array.isArray(数据.results) ? 数据.results : (Array.isArray(数据.data) ? 数据.data : []));
-      for (const 项 of 列表) {
-        const ip = String(项 && 项.ip || '').trim();
-        const code = String(项 && (项.countryCode || 项.country_code || 项.code) || '').trim().toUpperCase();
-        if (ip) 前置国家缓存.set('ip:' + ip, code || '');
-      }
-    } catch (错误) {}
-  }
-
+  const 实测出口映射 = 解析前置出口国家映射(获取有效配置快照().frontExitMap);
   const 结果 = new Map();
-  for (const 主机 of 主机列表) {
-    const ip = 主机到IP.get(主机) || '';
-    const code = ip ? (前置国家缓存.get('ip:' + ip) || '') : '';
-    结果.set(主机, code);
-    const 缓存键 = 'host:' + 主机;
-    const 已有 = 前置国家缓存.get(缓存键) || {};
-    前置国家缓存.set(缓存键, { ...已有, ip, code });
+  for (const 节点 of 节点列表) {
+    const 主机 = 规范化节点主机(节点.server);
+    if (主机) 结果.set(主机, 实测出口映射.get(主机.toLowerCase()) || '');
   }
   return 结果;
 }
@@ -2981,13 +2935,13 @@ async function 生成家宽链式值(链接列表) {
   const 加密前置 = 全部前置.filter(项 => 项.tls);
   const 原始前置节点 = 加密前置.length ? 加密前置 : 全部前置;
 
-  // 按每个前置 server 实际解析到的 IP 做国家级 GeoIP 命名，而不是跟随家宽国家筛选。
+  // 仅按用户实测的出口 IP 国家命名；没有实测结果就明确标为“待测前置”。
   const 前置国家代码 = await 获取前置国家代码映射(原始前置节点);
   const 前置国家计数 = {};
   const 前置节点 = 原始前置节点.map(项 => {
     const 主机 = 规范化节点主机(项.server);
     const 代码 = 前置国家代码.get(主机) || '';
-    const 国家名 = 代码 ? 家宽国家中文名(代码) : '未知';
+    const 国家名 = 代码 ? 家宽国家中文名(代码) : '待测';
     前置国家计数[国家名] = (前置国家计数[国家名] || 0) + 1;
     return {
       ...项,
@@ -6023,6 +5977,11 @@ async function 处理订阅值(请求241, 用户240 = null) {
                                     </select>
                                     <small style="color:#7aa9c4;font-size:.85rem;display:block;margin-top:8px;">选择美国后，CLASH 家宽订阅只保留当前可用的美国家宽节点。</small>
                                 </div>
+                                <div style="margin-top:14px;">
+                                    <label for="frontExitMap" style="display:block;margin-bottom:8px;color:#00f0ff;font-weight:bold;">前置节点实测出口国家</label>
+                                    <textarea id="frontExitMap" rows="4" placeholder="每行：前置服务器地址=出口国家代码&#10;例如：1.2.3.4=HK" style="width:100%;padding:10px 12px;background:rgba(0,0,0,.75);color:#00f0ff;border:1px solid #00f0ff;border-radius:5px;box-sizing:border-box;"></textarea>
+                                    <small style="color:#7aa9c4;font-size:.85rem;display:block;margin-top:8px;">先在客户端单独选中前置节点，查询真实出口 IP，确认国家后填写。未填写的统一显示“待测前置”，不会再按入口 IP 误标为美国。</small>
+                                </div>
                             </div>
                         </div>
                         <div style="margin-bottom: 15px;">
@@ -6909,6 +6868,7 @@ function 应用配置到界面(配置) {
   写入开关值('ena', 配置.ena, false);
   写入开关值('jk', 配置.jk, false);
   写入字段值('jkCountry', 配置.jkCountry || 'ALL');
+  写入字段值('frontExitMap', 配置.frontExitMap || '');
   const 家宽按钮 = document.getElementById('jkClientBtn');
   if (家宽按钮) 家宽按钮.style.display = 是否开关启用(配置.jk, false) ? '' : 'none';
   写入开关值('epd', 配置.epd, true);
@@ -6954,6 +6914,7 @@ function 收集界面配置() {
     ena: 读取开关值('ena', false),
     jk: 读取开关值('jk', false),
     jkCountry: 读取字段值('jkCountry') || 'ALL',
+    frontExitMap: 读取字段值('frontExitMap'),
     epd: 读取开关值('epd', true),
     epi: 读取开关值('epi', true),
     egi: 读取开关值('egi', true),
@@ -7157,6 +7118,7 @@ async function 重置全部配置() {
           ispUnicom: '',
           ispTelecom: '',
           jkCountry: '',
+          frontExitMap: '',
           homepage: '',
           alpn: ''
         })
